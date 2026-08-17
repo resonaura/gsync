@@ -17,7 +17,7 @@ export const GLYPHS = {
   // Progress blocks (high resolution fractional blocks)
   blocks: [' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'],
   fullBlock: '█',
-  emptyBlock: '░',
+  emptyBlock: ' ', // Empty space instead of ░
 
   // Badges & icons
   bullet: '●',
@@ -26,7 +26,6 @@ export const GLYPHS = {
   crossMark: '✖',
   pause: '⏸',
   running: '▶',
-  spinner: ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'],
 };
 
 export const THEME = {
@@ -64,4 +63,8 @@ export const ESC = {
   cursorHome: '\x1b[H',
   cursorTo: (row: number, col: number) => `\x1b[${row};${col}H`,
   clearLine: '\x1b[2K',
+
+  // Mouse tracking (SGR mode 1006 + normal tracking 1000/1002)
+  enableMouse: '\x1b[?1000h\x1b[?1002h\x1b[?1006h',
+  disableMouse: '\x1b[?1006l\x1b[?1002l\x1b[?1000l',
 };

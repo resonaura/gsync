@@ -19,6 +19,30 @@ export class InputHandler {
   }
 
   public handleInput(key: string): void {
+    // 1. Mouse SGR Scroll Up: \x1b[<64;...;...M / \x1b[<64;...;...m
+    if (/\x1b\[<64;\d+;\d+[Mm]/.test(key)) {
+      this.actions.onScrollUp(3);
+      return;
+    }
+
+    // 2. Mouse SGR Scroll Down: \x1b[<65;...;...M / \x1b[<65;...;...m
+    if (/\x1b\[<65;\d+;\d+[Mm]/.test(key)) {
+      this.actions.onScrollDown(3);
+      return;
+    }
+
+    // 3. Normal X10 Mouse Wheel
+    if (key.startsWith('\x1b[M')) {
+      const b = key.charCodeAt(3) - 32;
+      if (b === 64) {
+        this.actions.onScrollUp(3);
+        return;
+      } else if (b === 65) {
+        this.actions.onScrollDown(3);
+        return;
+      }
+    }
+
     // Ctrl+C or 'q' or 'Q'
     if (key === '\u0003' || key === 'q' || key === 'Q') {
       this.actions.onQuit();

@@ -23,8 +23,14 @@ export class ProgressParser {
   }
 
   public parseLine(line: string): { isProgress: boolean; metrics?: ProgressMetrics } {
-    const trimmed = line.trim();
+    let trimmed = line.trim();
     if (!trimmed) return { isProgress: false };
+
+    // Strip systemd / journalctl and rclone prefix if present
+    trimmed = trimmed
+      .replace(/^<\d+>(INFO|NOTICE|DEBUG|WARN|ERROR)\s*:\s*/i, '')
+      .replace(/^\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}:\d{2}\s+(INFO|NOTICE|DEBUG|WARN|ERROR)\s*:\s*/i, '')
+      .trim();
 
     let updated = false;
 
@@ -66,17 +72,15 @@ export class ProgressParser {
       updated = true;
     }
 
-    // 3. Rclone files count:
-    // "Transferred:        12 / 50, 24%"
-    const rcloneFilesMatch = trimmed.match(/Transferred:\s+(\d+)\s*\/\s*(\d+),\s*(\d+)%/i);
-    if (rcloneFilesMatch) {
-      this.metrics.filesTransferred = parseInt(rcloneFilesMatch[1], 10);
-      this.metrics.totalFiles = parseInt(rcloneFilesMatch[2], 10);
+    // 3. Rclone checks stats:
+    // "Checks: 105 / 346, 30%" or "(chk#105/346)"
+    const rcloneChecksInline = trimmed.match(/\(chk#(\d+)\/(\d+)\)/i);
+    if (rcloneChecksInline) {
+      this.metrics.checksDone = parseInt(rcloneChecksInline[1], 10);
+      this.metrics.totalChecks = parseInt(rcloneChecksInline[2], 10);
       updated = true;
     }
 
-    // 4. Rclone checks:
-    // "Checks:             120 / 120, 100%"
     const rcloneChecksMatch = trimmed.match(/Checks:\s+(\d+)\s*\/\s*(\d+)/i);
     if (rcloneChecksMatch) {
       this.metrics.checksDone = parseInt(rcloneChecksMatch[1], 10);
@@ -84,17 +88,37 @@ export class ProgressParser {
       updated = true;
     }
 
+    // 4. Rclone files count:
+    // "Transferred:        12 / 50, 24%" or "(xfr#12/50)"
+    const rcloneXfrInline = trimmed.match(/\(xfr#(\d+)\/(\d+)\)/i);
+    if (rcloneXfrInline) {
+      this.metrics.filesTransferred = parseInt(rcloneXfrInline[1], 10);
+      this.metrics.totalFiles = parseInt(rcloneXfrInline[2], 10);
+      updated = true;
+    }
+
+    const rcloneFilesMatch = trimmed.match(/Transferred:\s+(\d+)\s*\/\s*(\d+),\s*(\d+)%/i);
+    if (rcloneFilesMatch) {
+      this.metrics.filesTransferred = parseInt(rcloneFilesMatch[1], 10);
+      this.metrics.totalFiles = parseInt(rcloneFilesMatch[2], 10);
+      updated = true;
+    }
+
     // 5. Rclone single-line stats:
-    // "1.234G / 10.456G, 12%, 14.50M/s, 10m20s (xfr#12/50)"
+    // "1.234G / 10.456G, 12%, 14.50M/s, 10m20s"
+    // "0 B / 0 B, -, 0 B/s, ETA -"
     const rcloneOneLine = trimmed.match(
-      /^([\d.,]+[KMGT]?i?B?)\s*\/\s*([\d.,]+[KMGT]?i?B?),\s*(\d+)%,\s*([\d.,]+[KMGT]?i?B?\/s),\s*([^\s]+)/i,
+      /^([\d.,]+\s*[KMGT]?i?B?)\s*\/\s*([\d.,]+\s*[KMGT]?i?B?),\s*([0-9%]+|-),\s*([\d.,]+\s*[KMGT]?i?B?\/s),\s*(?:ETA\s*)?([^\s()]+)/i,
     );
     if (rcloneOneLine) {
       this.metrics.transferredBytes = parseBytes(rcloneOneLine[1]);
       this.metrics.totalBytes = parseBytes(rcloneOneLine[2]);
-      this.metrics.percentage = parseInt(rcloneOneLine[3], 10);
+      const p = parseInt(rcloneOneLine[3].replace('%', ''), 10);
+      if (!isNaN(p)) {
+        this.metrics.percentage = p;
+      }
       this.metrics.speed = rcloneOneLine[4];
-      this.metrics.eta = rcloneOneLine[5];
+      this.metrics.eta = rcloneOneLine[5] !== '-' ? rcloneOneLine[5] : '--:--:--';
       updated = true;
     }
 

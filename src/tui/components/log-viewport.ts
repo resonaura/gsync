@@ -11,7 +11,7 @@ export function renderLogViewport(state: TUIState, width: number, height: number
   // Viewport title / scroll status
   let scrollInfo = chalk.hex('#a6e3a1')('● AUTOSCROLL');
   if (!state.autoScroll) {
-    const currentLine = totalLogs - state.scrollOffset;
+    const currentLine = Math.max(1, totalLogs - state.scrollOffset);
     scrollInfo = chalk.bold.hex('#fab387')(`▲ SCROLL LOCK: ${currentLine}/${totalLogs}`);
   }
 
@@ -56,30 +56,44 @@ export function renderLogViewport(state: TUIState, width: number, height: number
 function formatLogRow(log: LogEntry, maxWidth: number): string {
   const time = chalk.hex('#6c7086')(`[${log.timestamp}]`);
   let badge = '';
+  let msgColor: (text: string) => string;
 
   switch (log.level) {
     case 'ERROR':
-      badge = chalk.bgHex('#f38ba8').hex('#11111b').bold(' ERR ') + ' ' + chalk.hex('#f38ba8');
+      badge = chalk.bgHex('#f38ba8').hex('#11111b').bold(' ERR ');
+      msgColor = chalk.hex('#f38ba8');
       break;
     case 'WARN':
-      badge = chalk.bgHex('#fab387').hex('#11111b').bold(' WRN ') + ' ' + chalk.hex('#fab387');
+      badge = chalk.bgHex('#fab387').hex('#11111b').bold(' WRN ');
+      msgColor = chalk.hex('#fab387');
       break;
     case 'SUCCESS':
-      badge = chalk.bgHex('#a6e3a1').hex('#11111b').bold(' OK  ') + ' ' + chalk.hex('#a6e3a1');
+      badge = chalk.bgHex('#a6e3a1').hex('#11111b').bold(' OK  ');
+      msgColor = chalk.hex('#a6e3a1');
       break;
     case 'DEBUG':
-      badge = chalk.bgHex('#45475a').hex('#cdd6f4')(' DBG ') + ' ' + chalk.hex('#6c7086');
+      badge = chalk.bgHex('#45475a').hex('#cdd6f4')(' DBG ');
+      msgColor = chalk.hex('#6c7086');
       break;
     case 'INFO':
     default:
-      badge = chalk.bgHex('#89b4fa').hex('#11111b').bold(' INF ') + ' ' + chalk.hex('#cdd6f4');
+      badge = chalk.bgHex('#89b4fa').hex('#11111b').bold(' INF ');
+      msgColor = chalk.hex('#cdd6f4');
       break;
   }
 
-  const prefix = ` ${time} ${badge}`;
+  const prefix = ` ${time} ${badge} `;
   const prefixVisLen = visibleLength(prefix);
   const maxMsgLen = Math.max(5, maxWidth - prefixVisLen - 1);
-  const truncatedMsg = truncateMiddle(log.message, maxMsgLen);
+  const cleanMessage = stripInternalNoise(log.message);
+  const truncatedMsg = truncateMiddle(cleanMessage, maxMsgLen);
 
-  return `${prefix}${truncatedMsg}`;
+  return `${prefix}${msgColor(truncatedMsg)}`;
+}
+
+function stripInternalNoise(str: string): string {
+  // Strip systemd rclone noise like <6>INFO : or <5>NOTICE :
+  return str
+    .replace(/^<\d+>(INFO|NOTICE|DEBUG|WARN|ERROR)\s*:\s*/i, '')
+    .replace(/^\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}:\d{2}\s+(INFO|NOTICE|DEBUG|WARN|ERROR)\s*:\s*/i, '');
 }

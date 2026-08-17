@@ -22,15 +22,15 @@ var GLYPHS = {
   // Progress blocks (high resolution fractional blocks)
   blocks: [" ", "\u258F", "\u258E", "\u258D", "\u258C", "\u258B", "\u258A", "\u2589", "\u2588"],
   fullBlock: "\u2588",
-  emptyBlock: "\u2591",
+  emptyBlock: " ",
+  // Empty space instead of ░
   // Badges & icons
   bullet: "\u25CF",
   sync: "\u{1F504}",
   check: "\u2714",
   crossMark: "\u2716",
   pause: "\u23F8",
-  running: "\u25B6",
-  spinner: ["\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"]
+  running: "\u25B6"
 };
 var THEME = {
   headerBg: chalk.bgHex("#1e1e2e").hex("#cdd6f4"),
@@ -63,7 +63,10 @@ var ESC = {
   clearScreen: "\x1B[2J",
   cursorHome: "\x1B[H",
   cursorTo: (row, col) => `\x1B[${row};${col}H`,
-  clearLine: "\x1B[2K"
+  clearLine: "\x1B[2K",
+  // Mouse tracking (SGR mode 1006 + normal tracking 1000/1002)
+  enableMouse: "\x1B[?1000h\x1B[?1002h\x1B[?1006h",
+  disableMouse: "\x1B[?1006l\x1B[?1002l\x1B[?1000l"
 };
 
 // src/tui/terminal.ts
@@ -71,7 +74,9 @@ var Terminal = class {
   isRaw = false;
   init() {
     if (process.stdout.isTTY) {
-      process.stdout.write(ESC.enterAltScreen + ESC.hideCursor + ESC.clearScreen);
+      process.stdout.write(
+        ESC.enterAltScreen + ESC.hideCursor + ESC.enableMouse + ESC.clearScreen
+      );
       if (process.stdin.isTTY) {
         process.stdin.setRawMode(true);
         process.stdin.resume();
@@ -97,7 +102,7 @@ var Terminal = class {
   }
   restore() {
     if (process.stdout.isTTY) {
-      process.stdout.write(ESC.showCursor + ESC.leaveAltScreen);
+      process.stdout.write(ESC.disableMouse + ESC.showCursor + ESC.leaveAltScreen);
     }
     if (this.isRaw && process.stdin.isTTY) {
       try {
@@ -219,7 +224,7 @@ function renderLogViewport(state, width, height) {
   const totalLogs = state.logs.length;
   let scrollInfo = chalk3.hex("#a6e3a1")("\u25CF AUTOSCROLL");
   if (!state.autoScroll) {
-    const currentLine = totalLogs - state.scrollOffset;
+    const currentLine = Math.max(1, totalLogs - state.scrollOffset);
     scrollInfo = chalk3.bold.hex("#fab387")(`\u25B2 SCROLL LOCK: ${currentLine}/${totalLogs}`);
   }
   const vpHeaderLeft = `\u251C\u2500${chalk3.bold.hex("#cdd6f4")(" \u{1F4DC} Live Transfer Logs ")}\u2500`;
@@ -251,29 +256,39 @@ function renderLogViewport(state, width, height) {
 function formatLogRow(log, maxWidth) {
   const time = chalk3.hex("#6c7086")(`[${log.timestamp}]`);
   let badge = "";
+  let msgColor;
   switch (log.level) {
     case "ERROR":
-      badge = chalk3.bgHex("#f38ba8").hex("#11111b").bold(" ERR ") + " " + chalk3.hex("#f38ba8");
+      badge = chalk3.bgHex("#f38ba8").hex("#11111b").bold(" ERR ");
+      msgColor = chalk3.hex("#f38ba8");
       break;
     case "WARN":
-      badge = chalk3.bgHex("#fab387").hex("#11111b").bold(" WRN ") + " " + chalk3.hex("#fab387");
+      badge = chalk3.bgHex("#fab387").hex("#11111b").bold(" WRN ");
+      msgColor = chalk3.hex("#fab387");
       break;
     case "SUCCESS":
-      badge = chalk3.bgHex("#a6e3a1").hex("#11111b").bold(" OK  ") + " " + chalk3.hex("#a6e3a1");
+      badge = chalk3.bgHex("#a6e3a1").hex("#11111b").bold(" OK  ");
+      msgColor = chalk3.hex("#a6e3a1");
       break;
     case "DEBUG":
-      badge = chalk3.bgHex("#45475a").hex("#cdd6f4")(" DBG ") + " " + chalk3.hex("#6c7086");
+      badge = chalk3.bgHex("#45475a").hex("#cdd6f4")(" DBG ");
+      msgColor = chalk3.hex("#6c7086");
       break;
     case "INFO":
     default:
-      badge = chalk3.bgHex("#89b4fa").hex("#11111b").bold(" INF ") + " " + chalk3.hex("#cdd6f4");
+      badge = chalk3.bgHex("#89b4fa").hex("#11111b").bold(" INF ");
+      msgColor = chalk3.hex("#cdd6f4");
       break;
   }
-  const prefix = ` ${time} ${badge}`;
+  const prefix = ` ${time} ${badge} `;
   const prefixVisLen = visibleLength(prefix);
   const maxMsgLen = Math.max(5, maxWidth - prefixVisLen - 1);
-  const truncatedMsg = truncateMiddle(log.message, maxMsgLen);
-  return `${prefix}${truncatedMsg}`;
+  const cleanMessage = stripInternalNoise(log.message);
+  const truncatedMsg = truncateMiddle(cleanMessage, maxMsgLen);
+  return `${prefix}${msgColor(truncatedMsg)}`;
+}
+function stripInternalNoise(str) {
+  return str.replace(/^<\d+>(INFO|NOTICE|DEBUG|WARN|ERROR)\s*:\s*/i, "").replace(/^\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}:\d{2}\s+(INFO|NOTICE|DEBUG|WARN|ERROR)\s*:\s*/i, "");
 }
 
 // src/tui/components/progress-bar.ts
@@ -287,7 +302,7 @@ function renderProgressBar(state, width) {
   const transferredStr = formatBytes(metrics.transferredBytes);
   const totalStr = metrics.totalBytes > 0 ? formatBytes(metrics.totalBytes) : "Scanning...";
   const sizeSummary = `${transferredStr} / ${totalStr}`;
-  const etaStr = metrics.eta ? `ETA: ${metrics.eta}` : "ETA: --:--:--";
+  const etaStr = metrics.eta && metrics.eta !== "-" ? `ETA: ${metrics.eta}` : "ETA: --:--:--";
   const fileSummary = metrics.totalFiles > 0 ? `Files: ${metrics.filesTransferred}/${metrics.totalFiles}` : metrics.filesTransferred > 0 ? `Files: ${metrics.filesTransferred}` : "Files: ...";
   const checkSummary = metrics.totalChecks > 0 ? `Checks: ${metrics.checksDone}/${metrics.totalChecks}` : "";
   const activeFile = metrics.currentFile ? chalk4.hex("#cba6f7")(` \u{1F4C4} Active: ${truncateMiddle(metrics.currentFile, innerWidth - 12)}`) : chalk4.hex("#6c7086")(" \u{1F4A4} No active file transfers in flight");
@@ -307,7 +322,7 @@ function renderProgressBar(state, width) {
   }
   const emptyCount = Math.max(0, barWidth - fullBlocksCount - (fractionIndex > 0 ? 1 : 0));
   if (emptyCount > 0) {
-    barContent += chalk4.hex("#313244")(GLYPHS.emptyBlock.repeat(emptyCount));
+    barContent += " ".repeat(emptyCount);
   }
   const pBarLine = ` [${barContent}] ` + chalk4.bold.hex(pct >= 100 ? "#a6e3a1" : "#89b4fa")(pctStr);
   lines.push(THEME.border(GLYPHS.v) + padVisible(` ${pBarLine}`, innerWidth) + THEME.border(GLYPHS.v));
@@ -439,6 +454,24 @@ var InputHandler = class {
     this.actions = actions;
   }
   handleInput(key) {
+    if (/\x1b\[<64;\d+;\d+[Mm]/.test(key)) {
+      this.actions.onScrollUp(3);
+      return;
+    }
+    if (/\x1b\[<65;\d+;\d+[Mm]/.test(key)) {
+      this.actions.onScrollDown(3);
+      return;
+    }
+    if (key.startsWith("\x1B[M")) {
+      const b = key.charCodeAt(3) - 32;
+      if (b === 64) {
+        this.actions.onScrollUp(3);
+        return;
+      } else if (b === 65) {
+        this.actions.onScrollDown(3);
+        return;
+      }
+    }
     if (key === "" || key === "q" || key === "Q") {
       this.actions.onQuit();
       return;
@@ -515,8 +548,9 @@ var ProgressParser = class {
     return { ...this.metrics };
   }
   parseLine(line) {
-    const trimmed = line.trim();
+    let trimmed = line.trim();
     if (!trimmed) return { isProgress: false };
+    trimmed = trimmed.replace(/^<\d+>(INFO|NOTICE|DEBUG|WARN|ERROR)\s*:\s*/i, "").replace(/^\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}:\d{2}\s+(INFO|NOTICE|DEBUG|WARN|ERROR)\s*:\s*/i, "").trim();
     let updated = false;
     const rsyncMatch = trimmed.match(
       /^\s*([\d,]+)\s+(\d+)%\s+([\d.]+\w+\/s)\s+(\d+:\d+:\d+)(?:\s+\(xfr#(\d+),\s+to-chk=(\d+)\/(\d+)\))?/i
@@ -550,10 +584,10 @@ var ProgressParser = class {
       this.metrics.eta = rcloneBytesMatch[5] || "--:--:--";
       updated = true;
     }
-    const rcloneFilesMatch = trimmed.match(/Transferred:\s+(\d+)\s*\/\s*(\d+),\s*(\d+)%/i);
-    if (rcloneFilesMatch) {
-      this.metrics.filesTransferred = parseInt(rcloneFilesMatch[1], 10);
-      this.metrics.totalFiles = parseInt(rcloneFilesMatch[2], 10);
+    const rcloneChecksInline = trimmed.match(/\(chk#(\d+)\/(\d+)\)/i);
+    if (rcloneChecksInline) {
+      this.metrics.checksDone = parseInt(rcloneChecksInline[1], 10);
+      this.metrics.totalChecks = parseInt(rcloneChecksInline[2], 10);
       updated = true;
     }
     const rcloneChecksMatch = trimmed.match(/Checks:\s+(\d+)\s*\/\s*(\d+)/i);
@@ -562,15 +596,30 @@ var ProgressParser = class {
       this.metrics.totalChecks = parseInt(rcloneChecksMatch[2], 10);
       updated = true;
     }
+    const rcloneXfrInline = trimmed.match(/\(xfr#(\d+)\/(\d+)\)/i);
+    if (rcloneXfrInline) {
+      this.metrics.filesTransferred = parseInt(rcloneXfrInline[1], 10);
+      this.metrics.totalFiles = parseInt(rcloneXfrInline[2], 10);
+      updated = true;
+    }
+    const rcloneFilesMatch = trimmed.match(/Transferred:\s+(\d+)\s*\/\s*(\d+),\s*(\d+)%/i);
+    if (rcloneFilesMatch) {
+      this.metrics.filesTransferred = parseInt(rcloneFilesMatch[1], 10);
+      this.metrics.totalFiles = parseInt(rcloneFilesMatch[2], 10);
+      updated = true;
+    }
     const rcloneOneLine = trimmed.match(
-      /^([\d.,]+[KMGT]?i?B?)\s*\/\s*([\d.,]+[KMGT]?i?B?),\s*(\d+)%,\s*([\d.,]+[KMGT]?i?B?\/s),\s*([^\s]+)/i
+      /^([\d.,]+\s*[KMGT]?i?B?)\s*\/\s*([\d.,]+\s*[KMGT]?i?B?),\s*([0-9%]+|-),\s*([\d.,]+\s*[KMGT]?i?B?\/s),\s*(?:ETA\s*)?([^\s()]+)/i
     );
     if (rcloneOneLine) {
       this.metrics.transferredBytes = parseBytes(rcloneOneLine[1]);
       this.metrics.totalBytes = parseBytes(rcloneOneLine[2]);
-      this.metrics.percentage = parseInt(rcloneOneLine[3], 10);
+      const p = parseInt(rcloneOneLine[3].replace("%", ""), 10);
+      if (!isNaN(p)) {
+        this.metrics.percentage = p;
+      }
       this.metrics.speed = rcloneOneLine[4];
-      this.metrics.eta = rcloneOneLine[5];
+      this.metrics.eta = rcloneOneLine[5] !== "-" ? rcloneOneLine[5] : "--:--:--";
       updated = true;
     }
     const rcloneFileProgress = trimmed.match(/^\*\s+(.+?):\s*(\d+)%\s*\/?([^,]*),\s*([\d.,]+\s*\w+\/s)?/i);
@@ -896,6 +945,7 @@ var ServiceWatcher = class extends EventEmitter2 {
 };
 
 // src/index.ts
+import { spawn as spawn3, execSync as execSync2 } from "child_process";
 var program = new Command();
 program.name("gsync").description("\u26A1 High-performance interactive TUI for Google Drive and rsync/rclone synchronization").version("1.0.0").option("-s, --source <path>", "Source directory to sync", "/mnt/backup").option("-r, --remote <remote>", "Target remote path", "gdrive:Sync/Backup").option("-e, --exclude-file <path>", "Path to rclone exclude file", "/home/resonaura/rclone-exclude.txt").option("-b, --bwlimit <limit>", "Bandwidth limit", "15M").option("-t, --transfers <number>", "Number of parallel transfers", "2").option("-c, --checkers <number>", "Number of checkers", "4").option("--direct", "Force direct sync process instead of attaching to service", false).action((options) => {
   runApp({
@@ -907,6 +957,48 @@ program.name("gsync").description("\u26A1 High-performance interactive TUI for G
     checkers: parseInt(options.checkers, 10),
     mode: options.direct ? "direct" : "daemon"
   });
+});
+program.command("daemon").description("Run headless background watcher daemon for automated sync").option("-s, --source <path>", "Source directory to sync", "/mnt/backup").option("-r, --remote <remote>", "Target remote path", "gdrive:Sync/Backup").option("-e, --exclude-file <path>", "Path to rclone exclude file", "/home/resonaura/rclone-exclude.txt").action((options) => {
+  runDaemon({
+    source: options.source,
+    remote: options.remote,
+    excludeFile: options.excludeFile,
+    mode: "direct"
+  });
+});
+program.command("service <action>").description("Manage systemd background service (status, restart, stop, logs)").action((action) => {
+  switch (action) {
+    case "status":
+      try {
+        execSync2("systemctl status gsync.service --no-pager", { stdio: "inherit" });
+      } catch {
+      }
+      break;
+    case "restart":
+      try {
+        execSync2("systemctl restart gsync.service", { stdio: "inherit" });
+        console.log("\u2705 gsync.service restarted.");
+      } catch (e) {
+        console.error("Failed to restart service:", e);
+      }
+      break;
+    case "stop":
+      try {
+        execSync2("systemctl stop gsync.service", { stdio: "inherit" });
+        console.log("\u{1F6D1} gsync.service stopped.");
+      } catch (e) {
+        console.error("Failed to stop service:", e);
+      }
+      break;
+    case "logs":
+      try {
+        execSync2("journalctl -u gsync.service -n 50 --no-pager", { stdio: "inherit" });
+      } catch {
+      }
+      break;
+    default:
+      console.log("Unknown action. Available: status, restart, stop, logs");
+  }
 });
 program.parse(process.argv);
 function runApp(config) {
@@ -937,10 +1029,11 @@ function runApp(config) {
     totalPausedDuration: 0
   };
   let engine;
-  const watcher = new ServiceWatcher("gdrive-sync.service");
-  if (config.mode === "daemon" && watcher.isServiceActive()) {
+  const watcher = new ServiceWatcher("gsync.service");
+  const oldWatcher = new ServiceWatcher("gdrive-sync.service");
+  if (config.mode === "daemon" && (watcher.isServiceActive() || oldWatcher.isServiceActive())) {
     config.mode = "daemon";
-    engine = watcher;
+    engine = watcher.isServiceActive() ? watcher : oldWatcher;
   } else {
     config.mode = "direct";
     engine = new SyncRunner(config);
@@ -1014,6 +1107,67 @@ function runApp(config) {
     engine.stop();
     terminal.restore();
     process.exit(code);
+  }
+}
+function runDaemon(config) {
+  console.log(`[Daemon] \u{1F680} GSYNC daemon started for ${config.source} -> ${config.remote}`);
+  let isSyncing = false;
+  let pendingSync = false;
+  const triggerSync = () => {
+    if (isSyncing) {
+      pendingSync = true;
+      return;
+    }
+    isSyncing = true;
+    console.log(`[Daemon] \u{1F4E4} [${(/* @__PURE__ */ new Date()).toLocaleTimeString()}] Starting synchronization cycle...`);
+    const runner = new SyncRunner(config);
+    runner.on("log", (log) => {
+      console.log(`[${log.timestamp}] [${log.level}] ${log.message}`);
+    });
+    runner.on("metrics", (metrics) => {
+      if (metrics.percentage > 0) {
+        console.log(`[Progress] ${metrics.percentage}% | ${metrics.speed} | ETA: ${metrics.eta} | Files: ${metrics.filesTransferred}/${metrics.totalFiles}`);
+      }
+    });
+    runner.on("exit", () => {
+      isSyncing = false;
+      console.log(`[Daemon] \u{1F634} Synchronization cycle finished. Watching for new changes...`);
+      if (pendingSync) {
+        pendingSync = false;
+        setTimeout(triggerSync, 5e3);
+      }
+    });
+    runner.start();
+  };
+  triggerSync();
+  try {
+    const inotify = spawn3("inotifywait", [
+      "-m",
+      "-r",
+      "-e",
+      "close_write,move,create,delete",
+      "--exclude",
+      "(cinema|\\.tmp|\\._*|node_modules|\\.git)",
+      config.source
+    ]);
+    let debounceTimer = null;
+    inotify.stdout.on("data", (data) => {
+      const line = data.toString().trim();
+      if (!line) return;
+      console.log(`[Daemon] \u{1F440} Change detected: ${line.split(" ").slice(2).join(" ")}`);
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        console.log(`[Daemon] \u23F1 Debounce finished, triggering sync...`);
+        triggerSync();
+      }, 15e3);
+    });
+    inotify.on("error", () => {
+      console.warn("[Daemon] inotifywait not found, running scheduled sync every 10 minutes.");
+      setInterval(triggerSync, 10 * 60 * 1e3);
+    });
+  } catch {
+    console.warn("[Daemon] Fallback: running scheduled sync every 10 minutes.");
+    setInterval(triggerSync, 10 * 60 * 1e3);
   }
 }
 //# sourceMappingURL=index.js.map

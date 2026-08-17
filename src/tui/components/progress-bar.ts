@@ -18,7 +18,7 @@ export function renderProgressBar(state: TUIState, width: number): string[] {
   const sizeSummary = `${transferredStr} / ${totalStr}`;
 
   // ETA & Files
-  const etaStr = metrics.eta ? `ETA: ${metrics.eta}` : 'ETA: --:--:--';
+  const etaStr = metrics.eta && metrics.eta !== '-' ? `ETA: ${metrics.eta}` : 'ETA: --:--:--';
   const fileSummary = metrics.totalFiles > 0
     ? `Files: ${metrics.filesTransferred}/${metrics.totalFiles}`
     : metrics.filesTransferred > 0
@@ -36,7 +36,7 @@ export function renderProgressBar(state: TUIState, width: number): string[] {
   lines.push(activeLine);
 
   // High-Resolution Unicode Progress Bar calculation
-  // We leave room for the percentage badge: [ ██████████░░░░░ ]  67%
+  // Empty space ' ' instead of ░ for a clean, minimalist modern look
   const barWidth = Math.max(10, innerWidth - 12);
   const exactProgress = (pct / 100) * barWidth;
   const fullBlocksCount = Math.floor(exactProgress);
@@ -52,10 +52,10 @@ export function renderProgressBar(state: TUIState, width: number): string[] {
   if (fullBlocksCount < barWidth && fractionIndex > 0) {
     barContent += chalk.hex('#89b4fa')(GLYPHS.blocks[fractionIndex]);
   }
-  // Empty blocks
+  // Empty blocks (spaces of exact same width)
   const emptyCount = Math.max(0, barWidth - fullBlocksCount - (fractionIndex > 0 ? 1 : 0));
   if (emptyCount > 0) {
-    barContent += chalk.hex('#313244')(GLYPHS.emptyBlock.repeat(emptyCount));
+    barContent += ' '.repeat(emptyCount);
   }
 
   const pBarLine = ` [${barContent}] ` + chalk.bold.hex(pct >= 100 ? '#a6e3a1' : '#89b4fa')(pctStr);

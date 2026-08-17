@@ -5,7 +5,9 @@ export class Terminal {
 
   public init(): void {
     if (process.stdout.isTTY) {
-      process.stdout.write(ESC.enterAltScreen + ESC.hideCursor + ESC.clearScreen);
+      process.stdout.write(
+        ESC.enterAltScreen + ESC.hideCursor + ESC.enableMouse + ESC.clearScreen,
+      );
       if (process.stdin.isTTY) {
         process.stdin.setRawMode(true);
         process.stdin.resume();
@@ -33,7 +35,7 @@ export class Terminal {
 
   public restore(): void {
     if (process.stdout.isTTY) {
-      process.stdout.write(ESC.showCursor + ESC.leaveAltScreen);
+      process.stdout.write(ESC.disableMouse + ESC.showCursor + ESC.leaveAltScreen);
     }
     if (this.isRaw && process.stdin.isTTY) {
       try {
