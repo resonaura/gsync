@@ -1,0 +1,37 @@
+{
+  "name": "gsync",
+  "version": "1.0.0",
+  "description": "High-performance interactive terminal UI for rsync and rclone synchronization",
+  "main": "dist/index.js",
+  "type": "module",
+  "bin": {
+    "gsync": "./bin/gsync.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [
+    "gsync",
+    "tui",
+    "rsync",
+    "rclone",
+    "cli",
+    "terminal"
+  ],
+  "author": "Andrii Vynohradov <resonaura@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "commander": "^13.1.0",
+    "execa": "^9.5.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.9",
+    "tsup": "^8.4.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}
