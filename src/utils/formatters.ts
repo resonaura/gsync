@@ -1,3 +1,5 @@
+import stringWidth from 'string-width';
+
 export function formatBytes(bytes: number, decimals: number = 2): string {
   if (!bytes || bytes === 0) return '0 B';
   const k = 1024;
@@ -45,20 +47,45 @@ export function formatDuration(seconds: number): string {
   return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
-export function truncateMiddle(str: string, maxLength: number): string {
-  if (!str || str.length <= maxLength) return str || '';
-  if (maxLength <= 5) return str.slice(0, maxLength);
-  const half = Math.floor((maxLength - 3) / 2);
-  return `${str.slice(0, half)}...${str.slice(str.length - (maxLength - 3 - half))}`;
-}
-
 export function stripAnsi(str: string): string {
   // eslint-disable-next-line no-control-regex
   return str.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
 }
 
 export function visibleLength(str: string): number {
-  return stripAnsi(str).length;
+  return stringWidth(str);
+}
+
+export function truncateMiddle(str: string, maxLength: number): string {
+  if (!str) return '';
+  const vis = visibleLength(str);
+  if (vis <= maxLength) return str;
+  if (maxLength <= 5) return str.slice(0, maxLength);
+
+  // Truncate by visual width
+  let left = '';
+  let right = '';
+  const half = Math.floor((maxLength - 3) / 2);
+
+  let curLeftWidth = 0;
+  for (const ch of str) {
+    const chW = stringWidth(ch);
+    if (curLeftWidth + chW > half) break;
+    left += ch;
+    curLeftWidth += chW;
+  }
+
+  let curRightWidth = 0;
+  const chars = Array.from(str);
+  for (let i = chars.length - 1; i >= 0; i--) {
+    const ch = chars[i];
+    const chW = stringWidth(ch);
+    if (curRightWidth + chW > half) break;
+    right = ch + right;
+    curRightWidth += chW;
+  }
+
+  return `${left}...${right}`;
 }
 
 export function padVisible(str: string, targetLen: number, char: string = ' '): string {

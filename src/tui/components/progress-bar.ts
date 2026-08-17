@@ -29,49 +29,49 @@ export function renderProgressBar(state: TUIState, width: number): string[] {
 
   // 1. Active transferring file line
   const activeFile = metrics.currentFile
-    ? chalk.hex('#cba6f7')(` 📄 Active: ${truncateMiddle(metrics.currentFile, innerWidth - 12)}`)
+    ? chalk.hex('#cba6f7')(` 📄 Active: ${truncateMiddle(metrics.currentFile, innerWidth - 14)}`)
     : chalk.hex('#6c7086')(' 💤 No active file transfers in flight');
 
   lines.push(THEME.border(GLYPHS.v) + padVisible(activeFile, innerWidth) + THEME.border(GLYPHS.v));
 
   // 2. High-Resolution Unicode Progress Bar
-  const barWidth = Math.max(10, innerWidth - 12);
+  const barWidth = Math.max(10, innerWidth - 10);
   const exactProgress = (pct / 100) * barWidth;
   const fullBlocksCount = Math.floor(exactProgress);
   const remainder = exactProgress - fullBlocksCount;
   const fractionIndex = Math.floor(remainder * 8);
 
   let barContent = '';
-  // Full blocks (Cyan -> Blue gradient)
   if (fullBlocksCount > 0) {
     barContent += chalk.bold.hex('#89b4fa')(GLYPHS.fullBlock.repeat(fullBlocksCount));
   }
-  // Fractional block
   if (fullBlocksCount < barWidth && fractionIndex > 0) {
     barContent += chalk.hex('#89b4fa')(GLYPHS.blocks[fractionIndex]);
   }
-  // Empty blocks (spaces of exact same width)
   const emptyCount = Math.max(0, barWidth - fullBlocksCount - (fractionIndex > 0 ? 1 : 0));
   if (emptyCount > 0) {
     barContent += ' '.repeat(emptyCount);
   }
 
-  const pBarLine = ` [${barContent}] ` + chalk.bold.hex(pct >= 100 ? '#a6e3a1' : '#89b4fa')(pctStr);
-  lines.push(THEME.border(GLYPHS.v) + padVisible(` ${pBarLine}`, innerWidth) + THEME.border(GLYPHS.v));
+  const pBarInner = ` [${barContent}] ` + chalk.bold.hex(pct >= 100 ? '#a6e3a1' : '#89b4fa')(pctStr);
+  lines.push(THEME.border(GLYPHS.v) + padVisible(pBarInner, innerWidth) + THEME.border(GLYPHS.v));
 
-  // 3. Stats line (Size, Files, ETA)
-  const leftStats = ` 📊 ${chalk.bold.hex('#cdd6f4')(sizeSummary)}  ${chalk.hex('#a6adc8')(fileSummary)}  ${chalk.hex('#6c7086')(checkSummary)}`;
+  // 3. Stats line (Size, Files, Checks, ETA) - dynamically fitting within innerWidth
   const rightStats = `${chalk.bold.hex('#f9e2af')(etaStr)} `;
-  const statsPad = Math.max(1, innerWidth - visibleLength(leftStats) - visibleLength(rightStats));
+  const rightLen = visibleLength(rightStats);
 
-  lines.push(
-    THEME.border(GLYPHS.v) +
-      leftStats +
-      ' '.repeat(statsPad) +
-      rightStats +
-      THEME.border(GLYPHS.v)
-  );
+  let leftStats = ` 📊 ${chalk.bold.hex('#cdd6f4')(sizeSummary)}`;
+  if (visibleLength(leftStats) + visibleLength(`  ${chalk.hex('#a6adc8')(fileSummary)}`) + rightLen + 2 <= innerWidth) {
+    leftStats += `  ${chalk.hex('#a6adc8')(fileSummary)}`;
+  }
+  if (checkSummary && visibleLength(leftStats) + visibleLength(`  ${chalk.hex('#6c7086')(checkSummary)}`) + rightLen + 2 <= innerWidth) {
+    leftStats += `  ${chalk.hex('#6c7086')(checkSummary)}`;
+  }
 
-  // Exactly 3 lines
+  const statsPad = Math.max(0, innerWidth - visibleLength(leftStats) - rightLen);
+  const statsLine = leftStats + ' '.repeat(statsPad) + rightStats;
+
+  lines.push(THEME.border(GLYPHS.v) + padVisible(statsLine, innerWidth) + THEME.border(GLYPHS.v));
+
   return lines;
 }

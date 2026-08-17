@@ -21,16 +21,38 @@ export function renderHeader(state: TUIState, config: SyncConfig, width: number)
   const timer = chalk.hex('#a6adc8')(`⏱ ${formatDuration(Math.max(0, elapsedSecs))}`);
 
   // Line 1: Top border with title
-  const topHeaderTitle = `╭─${title}─${modeBadge}─`;
-  const topHeaderRight = `─${timer}─╮`;
-  const topPad = Math.max(0, width - visibleLength(topHeaderTitle) - visibleLength(topHeaderRight));
-  lines.push(THEME.border(topHeaderTitle + GLYPHS.h.repeat(topPad) + topHeaderRight));
+  // ╭─ + title + ─ + modeBadge + ──...── + timer + ─╮
+  const titlePrefix = `${GLYPHS.tl}${GLYPHS.h}`;
+  const midDivider = `${GLYPHS.h}`;
+  const timerSuffix = `${GLYPHS.h}${GLYPHS.tr}`;
+
+  const fixedVisLen =
+    visibleLength(titlePrefix) +
+    visibleLength(title) +
+    visibleLength(midDivider) +
+    visibleLength(modeBadge) +
+    visibleLength(timer) +
+    visibleLength(timerSuffix);
+
+  const topPad = Math.max(0, width - fixedVisLen);
+
+  const line1 =
+    THEME.border(titlePrefix) +
+    title +
+    THEME.border(midDivider) +
+    modeBadge +
+    THEME.border(GLYPHS.h.repeat(topPad)) +
+    timer +
+    THEME.border(timerSuffix);
+
+  lines.push(line1);
 
   // Line 2: Content (Source -> Destination, Status badge, Speed)
+  const maxPathLen = Math.max(8, Math.floor((innerWidth - 30) / 2));
   const sourceDest = chalk.hex('#cdd6f4')('📂 ') +
-    chalk.bold.hex('#f5c2e7')(truncateMiddle(config.source, 24)) +
+    chalk.bold.hex('#f5c2e7')(truncateMiddle(config.source, maxPathLen)) +
     chalk.hex('#6c7086')(' ➔ ') +
-    chalk.bold.hex('#89b4fa')(truncateMiddle(config.remote, 24));
+    chalk.bold.hex('#89b4fa')(truncateMiddle(config.remote, maxPathLen));
 
   const speedText = state.metrics.speed && state.metrics.speed !== '0 B/s' && state.metrics.speed !== '0B/s'
     ? chalk.bold.hex('#a6e3a1')(` 🚀 ${state.metrics.speed}`)
@@ -38,17 +60,16 @@ export function renderHeader(state: TUIState, config: SyncConfig, width: number)
 
   const leftContent = ` ${sourceDest}`;
   const rightContent = `${speedText}  ${statusBadge} `;
-  const centerPad = Math.max(1, innerWidth - visibleLength(leftContent) - visibleLength(rightContent));
+  const centerPad = Math.max(0, innerWidth - visibleLength(leftContent) - visibleLength(rightContent));
 
-  lines.push(
+  const line2 =
     THEME.border(GLYPHS.v) +
-      leftContent +
-      ' '.repeat(centerPad) +
-      rightContent +
-      THEME.border(GLYPHS.v)
-  );
+    leftContent +
+    ' '.repeat(centerPad) +
+    rightContent +
+    THEME.border(GLYPHS.v);
 
-  // Return exactly 2 lines (Line 1 top border, Line 2 content)
-  // The bottom border is seamlessly shared with Log Viewport top border!
+  lines.push(line2);
+
   return lines;
 }

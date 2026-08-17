@@ -125,6 +125,7 @@ var Terminal = class {
 import chalk2 from "chalk";
 
 // src/utils/formatters.ts
+import stringWidth from "string-width";
 function formatBytes(bytes, decimals = 2) {
   if (!bytes || bytes === 0) return "0 B";
   const k = 1024;
@@ -169,17 +170,34 @@ function formatDuration(seconds) {
   const secs = Math.floor(seconds % 60);
   return `${hrs.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 }
-function truncateMiddle(str, maxLength) {
-  if (!str || str.length <= maxLength) return str || "";
-  if (maxLength <= 5) return str.slice(0, maxLength);
-  const half = Math.floor((maxLength - 3) / 2);
-  return `${str.slice(0, half)}...${str.slice(str.length - (maxLength - 3 - half))}`;
-}
-function stripAnsi(str) {
-  return str.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "");
-}
 function visibleLength(str) {
-  return stripAnsi(str).length;
+  return stringWidth(str);
+}
+function truncateMiddle(str, maxLength) {
+  if (!str) return "";
+  const vis = visibleLength(str);
+  if (vis <= maxLength) return str;
+  if (maxLength <= 5) return str.slice(0, maxLength);
+  let left = "";
+  let right = "";
+  const half = Math.floor((maxLength - 3) / 2);
+  let curLeftWidth = 0;
+  for (const ch of str) {
+    const chW = stringWidth(ch);
+    if (curLeftWidth + chW > half) break;
+    left += ch;
+    curLeftWidth += chW;
+  }
+  let curRightWidth = 0;
+  const chars = Array.from(str);
+  for (let i = chars.length - 1; i >= 0; i--) {
+    const ch = chars[i];
+    const chW = stringWidth(ch);
+    if (curRightWidth + chW > half) break;
+    right = ch + right;
+    curRightWidth += chW;
+  }
+  return `${left}...${right}`;
 }
 function padVisible(str, targetLen, char = " ") {
   const vis = visibleLength(str);
@@ -200,18 +218,21 @@ function renderHeader(state, config, width) {
   const modeBadge = config.mode === "daemon" ? chalk2.hex("#89dceb")("[DAEMON]") : chalk2.hex("#a6adc8")("[DIRECT]");
   const elapsedSecs = Math.floor((Date.now() - state.startTime) / 1e3) - state.totalPausedDuration;
   const timer = chalk2.hex("#a6adc8")(`\u23F1 ${formatDuration(Math.max(0, elapsedSecs))}`);
-  const topHeaderTitle = `\u256D\u2500${title}\u2500${modeBadge}\u2500`;
-  const topHeaderRight = `\u2500${timer}\u2500\u256E`;
-  const topPad = Math.max(0, width - visibleLength(topHeaderTitle) - visibleLength(topHeaderRight));
-  lines.push(THEME.border(topHeaderTitle + GLYPHS.h.repeat(topPad) + topHeaderRight));
-  const sourceDest = chalk2.hex("#cdd6f4")("\u{1F4C2} ") + chalk2.bold.hex("#f5c2e7")(truncateMiddle(config.source, 24)) + chalk2.hex("#6c7086")(" \u2794 ") + chalk2.bold.hex("#89b4fa")(truncateMiddle(config.remote, 24));
+  const titlePrefix = `${GLYPHS.tl}${GLYPHS.h}`;
+  const midDivider = `${GLYPHS.h}`;
+  const timerSuffix = `${GLYPHS.h}${GLYPHS.tr}`;
+  const fixedVisLen = visibleLength(titlePrefix) + visibleLength(title) + visibleLength(midDivider) + visibleLength(modeBadge) + visibleLength(timer) + visibleLength(timerSuffix);
+  const topPad = Math.max(0, width - fixedVisLen);
+  const line1 = THEME.border(titlePrefix) + title + THEME.border(midDivider) + modeBadge + THEME.border(GLYPHS.h.repeat(topPad)) + timer + THEME.border(timerSuffix);
+  lines.push(line1);
+  const maxPathLen = Math.max(8, Math.floor((innerWidth - 30) / 2));
+  const sourceDest = chalk2.hex("#cdd6f4")("\u{1F4C2} ") + chalk2.bold.hex("#f5c2e7")(truncateMiddle(config.source, maxPathLen)) + chalk2.hex("#6c7086")(" \u2794 ") + chalk2.bold.hex("#89b4fa")(truncateMiddle(config.remote, maxPathLen));
   const speedText = state.metrics.speed && state.metrics.speed !== "0 B/s" && state.metrics.speed !== "0B/s" ? chalk2.bold.hex("#a6e3a1")(` \u{1F680} ${state.metrics.speed}`) : "";
   const leftContent = ` ${sourceDest}`;
   const rightContent = `${speedText}  ${statusBadge} `;
-  const centerPad = Math.max(1, innerWidth - visibleLength(leftContent) - visibleLength(rightContent));
-  lines.push(
-    THEME.border(GLYPHS.v) + leftContent + " ".repeat(centerPad) + rightContent + THEME.border(GLYPHS.v)
-  );
+  const centerPad = Math.max(0, innerWidth - visibleLength(leftContent) - visibleLength(rightContent));
+  const line2 = THEME.border(GLYPHS.v) + leftContent + " ".repeat(centerPad) + rightContent + THEME.border(GLYPHS.v);
+  lines.push(line2);
   return lines;
 }
 
@@ -301,9 +322,9 @@ function renderProgressBar(state, width) {
   const etaStr = metrics.eta && metrics.eta !== "-" ? `ETA: ${metrics.eta}` : "ETA: --:--:--";
   const fileSummary = metrics.totalFiles > 0 ? `Files: ${metrics.filesTransferred}/${metrics.totalFiles}` : metrics.filesTransferred > 0 ? `Files: ${metrics.filesTransferred}` : "Files: ...";
   const checkSummary = metrics.totalChecks > 0 ? `Checks: ${metrics.checksDone}/${metrics.totalChecks}` : "";
-  const activeFile = metrics.currentFile ? chalk4.hex("#cba6f7")(` \u{1F4C4} Active: ${truncateMiddle(metrics.currentFile, innerWidth - 12)}`) : chalk4.hex("#6c7086")(" \u{1F4A4} No active file transfers in flight");
+  const activeFile = metrics.currentFile ? chalk4.hex("#cba6f7")(` \u{1F4C4} Active: ${truncateMiddle(metrics.currentFile, innerWidth - 14)}`) : chalk4.hex("#6c7086")(" \u{1F4A4} No active file transfers in flight");
   lines.push(THEME.border(GLYPHS.v) + padVisible(activeFile, innerWidth) + THEME.border(GLYPHS.v));
-  const barWidth = Math.max(10, innerWidth - 12);
+  const barWidth = Math.max(10, innerWidth - 10);
   const exactProgress = pct / 100 * barWidth;
   const fullBlocksCount = Math.floor(exactProgress);
   const remainder = exactProgress - fullBlocksCount;
@@ -319,14 +340,20 @@ function renderProgressBar(state, width) {
   if (emptyCount > 0) {
     barContent += " ".repeat(emptyCount);
   }
-  const pBarLine = ` [${barContent}] ` + chalk4.bold.hex(pct >= 100 ? "#a6e3a1" : "#89b4fa")(pctStr);
-  lines.push(THEME.border(GLYPHS.v) + padVisible(` ${pBarLine}`, innerWidth) + THEME.border(GLYPHS.v));
-  const leftStats = ` \u{1F4CA} ${chalk4.bold.hex("#cdd6f4")(sizeSummary)}  ${chalk4.hex("#a6adc8")(fileSummary)}  ${chalk4.hex("#6c7086")(checkSummary)}`;
+  const pBarInner = ` [${barContent}] ` + chalk4.bold.hex(pct >= 100 ? "#a6e3a1" : "#89b4fa")(pctStr);
+  lines.push(THEME.border(GLYPHS.v) + padVisible(pBarInner, innerWidth) + THEME.border(GLYPHS.v));
   const rightStats = `${chalk4.bold.hex("#f9e2af")(etaStr)} `;
-  const statsPad = Math.max(1, innerWidth - visibleLength(leftStats) - visibleLength(rightStats));
-  lines.push(
-    THEME.border(GLYPHS.v) + leftStats + " ".repeat(statsPad) + rightStats + THEME.border(GLYPHS.v)
-  );
+  const rightLen = visibleLength(rightStats);
+  let leftStats = ` \u{1F4CA} ${chalk4.bold.hex("#cdd6f4")(sizeSummary)}`;
+  if (visibleLength(leftStats) + visibleLength(`  ${chalk4.hex("#a6adc8")(fileSummary)}`) + rightLen + 2 <= innerWidth) {
+    leftStats += `  ${chalk4.hex("#a6adc8")(fileSummary)}`;
+  }
+  if (checkSummary && visibleLength(leftStats) + visibleLength(`  ${chalk4.hex("#6c7086")(checkSummary)}`) + rightLen + 2 <= innerWidth) {
+    leftStats += `  ${chalk4.hex("#6c7086")(checkSummary)}`;
+  }
+  const statsPad = Math.max(0, innerWidth - visibleLength(leftStats) - rightLen);
+  const statsLine = leftStats + " ".repeat(statsPad) + rightStats;
+  lines.push(THEME.border(GLYPHS.v) + padVisible(statsLine, innerWidth) + THEME.border(GLYPHS.v));
   return lines;
 }
 
