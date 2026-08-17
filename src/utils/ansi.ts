@@ -17,21 +17,22 @@ export const GLYPHS = {
   // Progress blocks (high resolution fractional blocks)
   blocks: [' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'],
   fullBlock: '█',
-  emptyBlock: ' ', // Empty space instead of ░
+  emptyBlock: ' ',
 
   // Badges & icons
-  bullet: '●',
+  play: '▶',
   sync: '🔄',
   check: '✔',
   crossMark: '✖',
   pause: '⏸',
-  running: '▶',
+  downArrow: '↓',
+  upArrow: '▲',
 };
 
 export const THEME = {
   headerBg: chalk.bgHex('#1e1e2e').hex('#cdd6f4'),
   headerTitle: chalk.bold.hex('#89b4fa'),
-  badgeRunning: chalk.bold.hex('#a6e3a1')('● RUNNING'),
+  badgeRunning: chalk.bold.hex('#a6e3a1')('▶ RUNNING'),
   badgeScanning: chalk.bold.hex('#f9e2af')('◌ SCANNING'),
   badgePaused: chalk.bold.hex('#fab387')('⏸ PAUSED'),
   badgeCompleted: chalk.bold.hex('#a6e3a1')('✔ COMPLETED'),

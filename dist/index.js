@@ -23,19 +23,19 @@ var GLYPHS = {
   blocks: [" ", "\u258F", "\u258E", "\u258D", "\u258C", "\u258B", "\u258A", "\u2589", "\u2588"],
   fullBlock: "\u2588",
   emptyBlock: " ",
-  // Empty space instead of ░
   // Badges & icons
-  bullet: "\u25CF",
+  play: "\u25B6",
   sync: "\u{1F504}",
   check: "\u2714",
   crossMark: "\u2716",
   pause: "\u23F8",
-  running: "\u25B6"
+  downArrow: "\u2193",
+  upArrow: "\u25B2"
 };
 var THEME = {
   headerBg: chalk.bgHex("#1e1e2e").hex("#cdd6f4"),
   headerTitle: chalk.bold.hex("#89b4fa"),
-  badgeRunning: chalk.bold.hex("#a6e3a1")("\u25CF RUNNING"),
+  badgeRunning: chalk.bold.hex("#a6e3a1")("\u25B6 RUNNING"),
   badgeScanning: chalk.bold.hex("#f9e2af")("\u25CC SCANNING"),
   badgePaused: chalk.bold.hex("#fab387")("\u23F8 PAUSED"),
   badgeCompleted: chalk.bold.hex("#a6e3a1")("\u2714 COMPLETED"),
@@ -221,7 +221,7 @@ function renderLogViewport(state, width, effectiveRows) {
   const lines = [];
   const innerWidth = Math.max(10, width - 2);
   const totalLogs = state.logs.length;
-  let scrollInfo = chalk3.hex("#a6e3a1")("\u25CF AUTOSCROLL");
+  let scrollInfo = chalk3.hex("#a6e3a1")("\u2193 AUTOSCROLL");
   if (!state.autoScroll) {
     const currentLine = Math.max(1, totalLogs - state.scrollOffset);
     scrollInfo = chalk3.bold.hex("#fab387")(`\u25B2 SCROLL LOCK: ${currentLine}/${totalLogs}`);

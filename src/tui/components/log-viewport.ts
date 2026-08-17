@@ -9,7 +9,7 @@ export function renderLogViewport(state: TUIState, width: number, effectiveRows:
   const totalLogs = state.logs.length;
 
   // Viewport title / scroll status
-  let scrollInfo = chalk.hex('#a6e3a1')('● AUTOSCROLL');
+  let scrollInfo = chalk.hex('#a6e3a1')('↓ AUTOSCROLL');
   if (!state.autoScroll) {
     const currentLine = Math.max(1, totalLogs - state.scrollOffset);
     scrollInfo = chalk.bold.hex('#fab387')(`▲ SCROLL LOCK: ${currentLine}/${totalLogs}`);
@@ -90,13 +90,9 @@ function formatLogRow(log: LogEntry, maxWidth: number): string {
 
 function cleanLogMessage(str: string): string {
   return str
-    // Strip journalctl and systemd timestamps e.g. [8:17:35 AM]
     .replace(/^\[\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM)?\]\s*/i, '')
-    // Strip [INFO] / [ERROR] / [WARN] brackets
     .replace(/^\[(INFO|NOTICE|DEBUG|WARN|ERROR)\]\s*/i, '')
-    // Strip rclone priority codes <6>INFO :
     .replace(/^<\d+>(INFO|NOTICE|DEBUG|WARN|ERROR)\s*:\s*/i, '')
-    // Strip rclone date timestamp 2026/08/17 08:14:34 INFO :
     .replace(/^\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}:\d{2}\s+(INFO|NOTICE|DEBUG|WARN|ERROR)\s*:\s*/i, '')
     .trim();
 }
