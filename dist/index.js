@@ -333,9 +333,9 @@ function renderProgressBar(state, width) {
 // src/tui/components/keybindings-bar.ts
 function renderKeybindingsBar(state, width) {
   const lines = [];
-  const innerWidth = Math.max(10, width - 2);
+  const innerContentWidth = Math.max(5, width - 4);
   const pauseLabel = state.status === "PAUSED" ? "Resume" : "Pause";
-  const shortcuts = [
+  const allShortcuts = [
     { key: "Space/P", desc: pauseLabel },
     { key: "\u2191/\u2193/Wheel", desc: "Scroll" },
     { key: "F/S", desc: state.autoScroll ? "Lock Scroll" : "Autoscroll" },
@@ -343,13 +343,20 @@ function renderKeybindingsBar(state, width) {
     { key: "H/?", desc: "Help" },
     { key: "Q/^C", desc: "Quit" }
   ];
-  const renderedItems = shortcuts.map(
-    (s) => THEME.keyTag(s.key) + THEME.keyDesc(s.desc)
-  ).join(" ");
-  const content = ` ${renderedItems}`;
-  const pad = Math.max(0, innerWidth - visibleLength(content));
+  const activeShortcuts = [];
+  let currentLen = 1;
+  for (const s of allShortcuts) {
+    const itemStr = THEME.keyTag(s.key) + THEME.keyDesc(s.desc);
+    const itemVisLen = visibleLength(itemStr) + (activeShortcuts.length > 0 ? 1 : 0);
+    if (currentLen + itemVisLen <= innerContentWidth) {
+      activeShortcuts.push(itemStr);
+      currentLen += itemVisLen;
+    }
+  }
+  const content = ` ${activeShortcuts.join(" ")}`;
+  const padLen = Math.max(0, innerContentWidth - visibleLength(content));
   lines.push(
-    THEME.border(GLYPHS.bl + GLYPHS.h) + content + " ".repeat(pad) + THEME.border(GLYPHS.h + GLYPHS.br)
+    THEME.border(GLYPHS.bl + GLYPHS.h) + content + " ".repeat(padLen) + THEME.border(GLYPHS.h + GLYPHS.br)
   );
   return lines;
 }
@@ -364,16 +371,17 @@ function renderHelpModal(width, height) {
   lines.push(THEME.border(header + GLYPHS.h.repeat(headerPad) + GLYPHS.tr));
   const helpItems = [
     { key: "Space or P", desc: "Pause / Resume the active synchronization (SIGSTOP/SIGCONT)" },
+    { key: "Mouse Wheel", desc: "Scroll log buffer up or down smoothly" },
     { key: "\u2191 / \u2193 (Up/Down)", desc: "Scroll log buffer up or down line by line" },
     { key: "PageUp / PageDown", desc: "Scroll log buffer by 10 lines at a time" },
     { key: "Home / End", desc: "Jump to very top / very bottom of the log buffer" },
     { key: "F or S", desc: "Toggle Follow / Autoscroll mode" },
     { key: "C", desc: "Clear log ring buffer" },
     { key: "H or ?", desc: "Toggle this Help window" },
-    { key: "Q or Ctrl+C", desc: "Safely terminate process and exit TUI" },
+    { key: "Q or Ctrl+C", desc: "Exit client (background sync continues in service)" },
     { key: "", desc: "" },
-    { key: "Features:", desc: "Excluded path: /backup/cinema is permanently blocked from upload" },
-    { key: "", desc: "Direct memory buffer streams with zero disk latency" },
+    { key: "Features:", desc: "Excluded: /backup/cinema is permanently blocked from cloud upload" },
+    { key: "", desc: "Instant attach/detach without killing background daemon" },
     { key: "", desc: "High-resolution fractional Unicode progress bar (\u2588\u2589\u258A\u258B\u258C\u258D\u258E\u258F)" }
   ];
   for (const item of helpItems) {
@@ -393,8 +401,9 @@ function renderHelpModal(width, height) {
   for (let i = 0; i < remaining; i++) {
     lines.push(THEME.border(GLYPHS.v) + " ".repeat(innerWidth) + THEME.border(GLYPHS.v));
   }
+  const innerContentWidth = Math.max(5, width - 4);
   const closePrompt = ` Press ${THEME.keyTag("H")} or ${THEME.keyTag("Esc")} to close help `;
-  const closePad = Math.max(0, innerWidth - visibleLength(closePrompt));
+  const closePad = Math.max(0, innerContentWidth - visibleLength(closePrompt));
   lines.push(
     THEME.border(GLYPHS.bl + GLYPHS.h) + closePrompt + " ".repeat(closePad) + THEME.border(GLYPHS.h + GLYPHS.br)
   );
