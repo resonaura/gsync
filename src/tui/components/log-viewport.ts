@@ -3,7 +3,7 @@ import { GLYPHS, THEME } from '../../utils/ansi.js';
 import { padVisible, truncateMiddle, visibleLength } from '../../utils/formatters.js';
 import { LogEntry, TUIState } from '../../types.js';
 
-export function renderLogViewport(state: TUIState, width: number, height: number): string[] {
+export function renderLogViewport(state: TUIState, width: number, effectiveRows: number): string[] {
   const lines: string[] = [];
   const innerWidth = Math.max(10, width - 2);
   const totalLogs = state.logs.length;
@@ -15,39 +15,36 @@ export function renderLogViewport(state: TUIState, width: number, height: number
     scrollInfo = chalk.bold.hex('#fab387')(`▲ SCROLL LOCK: ${currentLine}/${totalLogs}`);
   }
 
+  // 1. Top border connected seamlessly with Header
   const vpHeaderLeft = `├─${chalk.bold.hex('#cdd6f4')(' 📜 Live Transfer Logs ')}─`;
   const vpHeaderRight = `─[ ${scrollInfo} ]─┤`;
   const vpPad = Math.max(0, width - visibleLength(vpHeaderLeft) - visibleLength(vpHeaderRight));
   lines.push(THEME.border(vpHeaderLeft + GLYPHS.h.repeat(vpPad) + vpHeaderRight));
 
   // Determine slice of logs to display
-  const effectiveHeight = Math.max(1, height - 2); // subtract borders
   let startIdx: number;
-
   if (state.autoScroll || state.scrollOffset === 0) {
-    startIdx = Math.max(0, totalLogs - effectiveHeight);
+    startIdx = Math.max(0, totalLogs - effectiveRows);
   } else {
     const endIdx = Math.max(0, totalLogs - state.scrollOffset);
-    startIdx = Math.max(0, endIdx - effectiveHeight);
+    startIdx = Math.max(0, endIdx - effectiveRows);
   }
 
-  const visibleLogs = state.logs.slice(startIdx, startIdx + effectiveHeight);
+  const visibleLogs = state.logs.slice(startIdx, startIdx + effectiveRows);
 
-  // Render log rows
-  for (let i = 0; i < effectiveHeight; i++) {
+  // 2. Render log rows
+  for (let i = 0; i < effectiveRows; i++) {
     const log = visibleLogs[i];
-    let rowContent = '';
+    let rowContent = ' ';
 
     if (log) {
       rowContent = formatLogRow(log, innerWidth);
-    } else {
-      rowContent = ' ';
     }
 
     lines.push(THEME.border(GLYPHS.v) + padVisible(rowContent, innerWidth) + THEME.border(GLYPHS.v));
   }
 
-  // Bottom separator for log viewport
+  // 3. Bottom separator between Log Viewport and Progress Bar
   lines.push(THEME.border(GLYPHS.tLeft + GLYPHS.h.repeat(innerWidth) + GLYPHS.tRight));
 
   return lines;
@@ -85,15 +82,21 @@ function formatLogRow(log: LogEntry, maxWidth: number): string {
   const prefix = ` ${time} ${badge} `;
   const prefixVisLen = visibleLength(prefix);
   const maxMsgLen = Math.max(5, maxWidth - prefixVisLen - 1);
-  const cleanMessage = stripInternalNoise(log.message);
+  const cleanMessage = cleanLogMessage(log.message);
   const truncatedMsg = truncateMiddle(cleanMessage, maxMsgLen);
 
   return `${prefix}${msgColor(truncatedMsg)}`;
 }
 
-function stripInternalNoise(str: string): string {
-  // Strip systemd rclone noise like <6>INFO : or <5>NOTICE :
+function cleanLogMessage(str: string): string {
   return str
+    // Strip journalctl and systemd timestamps e.g. [8:17:35 AM]
+    .replace(/^\[\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM)?\]\s*/i, '')
+    // Strip [INFO] / [ERROR] / [WARN] brackets
+    .replace(/^\[(INFO|NOTICE|DEBUG|WARN|ERROR)\]\s*/i, '')
+    // Strip rclone priority codes <6>INFO :
     .replace(/^<\d+>(INFO|NOTICE|DEBUG|WARN|ERROR)\s*:\s*/i, '')
-    .replace(/^\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}:\d{2}\s+(INFO|NOTICE|DEBUG|WARN|ERROR)\s*:\s*/i, '');
+    // Strip rclone date timestamp 2026/08/17 08:14:34 INFO :
+    .replace(/^\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}:\d{2}\s+(INFO|NOTICE|DEBUG|WARN|ERROR)\s*:\s*/i, '')
+    .trim();
 }

@@ -11,9 +11,9 @@ export function renderKeybindingsBar(state: TUIState, width: number): string[] {
   const pauseLabel = state.status === 'PAUSED' ? 'Resume' : 'Pause';
   const shortcuts = [
     { key: 'Space/P', desc: pauseLabel },
-    { key: '↑/↓', desc: 'Scroll' },
+    { key: '↑/↓/Wheel', desc: 'Scroll' },
     { key: 'F/S', desc: state.autoScroll ? 'Lock Scroll' : 'Autoscroll' },
-    { key: 'C', desc: 'Clear Logs' },
+    { key: 'C', desc: 'Clear' },
     { key: 'H/?', desc: 'Help' },
     { key: 'Q/^C', desc: 'Quit' },
   ];
@@ -25,7 +25,7 @@ export function renderKeybindingsBar(state: TUIState, width: number): string[] {
   const content = ` ${renderedItems}`;
   const pad = Math.max(0, innerWidth - visibleLength(content));
 
-  // Bottom line of entire UI with rounded corners
+  // Bottom line of entire UI with rounded corners (exactly 1 line)
   lines.push(
     THEME.border(GLYPHS.bl + GLYPHS.h) +
       content +

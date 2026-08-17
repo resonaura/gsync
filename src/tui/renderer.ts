@@ -10,7 +10,7 @@ export class TUIRenderer {
   private lastRenderOutput = '';
 
   public render(state: TUIState, config: SyncConfig, width: number, height: number): void {
-    if (width < 30 || height < 12) {
+    if (width < 30 || height < 10) {
       this.renderSmallScreenWarning(width, height);
       return;
     }
@@ -21,15 +21,15 @@ export class TUIRenderer {
       return;
     }
 
-    const headerLines = renderHeader(state, config, width); // 3 lines
+    const headerLines = renderHeader(state, config, width); // 2 lines
     const progressBarLines = renderProgressBar(state, width); // 3 lines
     const footerLines = renderKeybindingsBar(state, width); // 1 line
 
-    // Calculate viewport height
-    const reservedHeight = headerLines.length + progressBarLines.length + footerLines.length;
-    const viewportHeight = Math.max(3, height - reservedHeight);
+    // 2 (header) + 2 (log top/bottom borders) + 3 (progress) + 1 (footer) = 8
+    const fixedRows = headerLines.length + 2 + progressBarLines.length + footerLines.length;
+    const effectiveLogRows = Math.max(1, height - fixedRows);
 
-    const logLines = renderLogViewport(state, width, viewportHeight);
+    const logLines = renderLogViewport(state, width, effectiveLogRows);
 
     const fullScreenLines = [
       ...headerLines,
@@ -43,6 +43,7 @@ export class TUIRenderer {
 
   private writeBuffer(lines: string[], maxRows: number): void {
     const cropped = lines.slice(0, maxRows);
+    // Use cursorHome and join with \n (no trailing newline to avoid scrolling)
     const output = ESC.cursorHome + cropped.join('\n');
 
     if (output !== this.lastRenderOutput) {
@@ -52,7 +53,7 @@ export class TUIRenderer {
   }
 
   private renderSmallScreenWarning(width: number, height: number): void {
-    const msg = `Terminal too small: ${width}x${height} (Min: 30x12)`;
+    const msg = `Terminal too small: ${width}x${height} (Min: 30x10)`;
     process.stdout.write(ESC.cursorHome + msg);
   }
 }

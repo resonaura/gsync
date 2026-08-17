@@ -44,7 +44,6 @@ export class SyncRunner extends EventEmitter {
       '--stats=1s',
       '--stats-one-line',
       '--log-level=INFO',
-      // Always exclude cinema to prevent massive unwanted media uploads
       '--exclude=cinema/**',
       '--exclude=cinema/',
       '--exclude=/cinema/**',
@@ -64,9 +63,8 @@ export class SyncRunner extends EventEmitter {
 
       this.setStatus('RUNNING');
 
-      // Process stdout (rclone output contains \r and \n)
-      this.handleStream(this.childProcess.stdout, false);
-      this.handleStream(this.childProcess.stderr, true);
+      this.handleStream(this.childProcess.stdout);
+      this.handleStream(this.childProcess.stderr);
 
       this.childProcess.on('error', (err) => {
         this.setStatus('ERROR');
@@ -142,13 +140,12 @@ export class SyncRunner extends EventEmitter {
     }
   }
 
-  private handleStream(stream: NodeJS.ReadableStream | null, isStderr: boolean): void {
+  private handleStream(stream: NodeJS.ReadableStream | null): void {
     if (!stream) return;
     let buffer = '';
 
     stream.on('data', (chunk: Buffer) => {
       buffer += chunk.toString();
-      // Split on \r or \n
       const parts = buffer.split(/[\r\n]+/);
       buffer = parts.pop() || '';
 
@@ -160,19 +157,20 @@ export class SyncRunner extends EventEmitter {
         if (isProgress && metrics) {
           this.emit('metrics', metrics);
         } else {
-          const level = this.detectLogLevel(trimmed, isStderr);
+          const level = this.detectLogLevel(trimmed);
           this.addLog(level, trimmed);
         }
       }
     });
   }
 
-  private detectLogLevel(line: string, isStderr: boolean): LogLevel {
+  private detectLogLevel(line: string): LogLevel {
     const upper = line.toUpperCase();
-    if (upper.includes('ERROR') || upper.includes('FAILED') || isStderr) return 'ERROR';
-    if (upper.includes('WARN') || upper.includes('WAIT')) return 'WARN';
+    if (upper.includes('ERROR') || upper.includes('FATAL') || upper.includes('FAILED')) return 'ERROR';
+    if (upper.includes('WARN') || upper.includes('WAITING') || upper.includes('PAUSED')) return 'WARN';
     if (upper.includes('DONE') || upper.includes('COMPLETED') || upper.includes('SUCCESS') || upper.includes('ПОГНАЛИ'))
       return 'SUCCESS';
+    if (upper.includes('DEBUG')) return 'DEBUG';
     return 'INFO';
   }
 

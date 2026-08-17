@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { GLYPHS, THEME } from '../../utils/ansi.js';
-import { formatDuration, padVisible, truncateMiddle, visibleLength } from '../../utils/formatters.js';
+import { formatDuration, truncateMiddle, visibleLength } from '../../utils/formatters.js';
 import { SyncConfig, TUIState } from '../../types.js';
 
 export function renderHeader(state: TUIState, config: SyncConfig, width: number): string[] {
@@ -16,7 +16,7 @@ export function renderHeader(state: TUIState, config: SyncConfig, width: number)
 
   // Title & Mode
   const title = THEME.headerTitle(' ⚡ GSYNC ') + chalk.hex('#6c7086')('v1.0.0');
-  const modeBadge = config.mode === 'daemon' ? chalk.hex('#89dceb')('[SERVICE ATTACHED]') : chalk.hex('#a6adc8')('[DIRECT SYNC]');
+  const modeBadge = config.mode === 'daemon' ? chalk.hex('#89dceb')('[DAEMON]') : chalk.hex('#a6adc8')('[DIRECT]');
   const elapsedSecs = Math.floor((Date.now() - state.startTime) / 1000) - state.totalPausedDuration;
   const timer = chalk.hex('#a6adc8')(`⏱ ${formatDuration(Math.max(0, elapsedSecs))}`);
 
@@ -28,11 +28,11 @@ export function renderHeader(state: TUIState, config: SyncConfig, width: number)
 
   // Line 2: Content (Source -> Destination, Status badge, Speed)
   const sourceDest = chalk.hex('#cdd6f4')('📂 ') +
-    chalk.bold.hex('#f5c2e7')(truncateMiddle(config.source, 25)) +
+    chalk.bold.hex('#f5c2e7')(truncateMiddle(config.source, 24)) +
     chalk.hex('#6c7086')(' ➔ ') +
-    chalk.bold.hex('#89b4fa')(truncateMiddle(config.remote, 25));
+    chalk.bold.hex('#89b4fa')(truncateMiddle(config.remote, 24));
 
-  const speedText = state.metrics.speed && state.metrics.speed !== '0 B/s'
+  const speedText = state.metrics.speed && state.metrics.speed !== '0 B/s' && state.metrics.speed !== '0B/s'
     ? chalk.bold.hex('#a6e3a1')(` 🚀 ${state.metrics.speed}`)
     : '';
 
@@ -48,8 +48,7 @@ export function renderHeader(state: TUIState, config: SyncConfig, width: number)
       THEME.border(GLYPHS.v)
   );
 
-  // Line 3: Bottom border of header
-  lines.push(THEME.border(GLYPHS.tLeft + GLYPHS.h.repeat(innerWidth) + GLYPHS.tRight));
-
+  // Return exactly 2 lines (Line 1 top border, Line 2 content)
+  // The bottom border is seamlessly shared with Log Viewport top border!
   return lines;
 }

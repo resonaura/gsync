@@ -11,7 +11,7 @@ export class ServiceWatcher extends EventEmitter {
   private serviceName: string;
   private isPaused = false;
 
-  constructor(serviceName: string = 'gdrive-sync.service') {
+  constructor(serviceName: string = 'gsync.service') {
     super();
     this.serviceName = serviceName;
     this.parser = new ProgressParser();
@@ -45,7 +45,6 @@ export class ServiceWatcher extends EventEmitter {
     this.addLog('INFO', `Attached to live daemon service: ${this.serviceName}`);
 
     try {
-      // Follow journalctl with 100 historical lines
       this.childProcess = spawn(
         'journalctl',
         ['-u', this.serviceName, '-f', '-n', '100', '--output=cat', '--no-tail'],
@@ -138,8 +137,10 @@ export class ServiceWatcher extends EventEmitter {
 
   private detectLogLevel(line: string): LogLevel {
     const upper = line.toUpperCase();
-    if (upper.includes('ERROR') || upper.includes('FAILED')) return 'ERROR';
-    if (upper.includes('WARN') || upper.includes('WAIT')) return 'WARN';
+    if (upper.includes('INFO') || upper.includes('NOTICE') || upper.includes('BANDWIDTH LIMITER') || upper.includes('STARTING SYNC'))
+      return 'INFO';
+    if (upper.includes('ERROR') || upper.includes('FATAL') || upper.includes('FAILED')) return 'ERROR';
+    if (upper.includes('WARN') || upper.includes('PAUSED') || upper.includes('WAITING')) return 'WARN';
     if (upper.includes('DONE') || upper.includes('COMPLETED') || upper.includes('SUCCESS') || upper.includes('ПОГНАЛИ'))
       return 'SUCCESS';
     return 'INFO';

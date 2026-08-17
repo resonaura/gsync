@@ -27,16 +27,14 @@ export function renderProgressBar(state: TUIState, width: number): string[] {
 
   const checkSummary = metrics.totalChecks > 0 ? `Checks: ${metrics.checksDone}/${metrics.totalChecks}` : '';
 
-  // Active transferring file line
+  // 1. Active transferring file line
   const activeFile = metrics.currentFile
     ? chalk.hex('#cba6f7')(` 📄 Active: ${truncateMiddle(metrics.currentFile, innerWidth - 12)}`)
     : chalk.hex('#6c7086')(' 💤 No active file transfers in flight');
 
-  const activeLine = THEME.border(GLYPHS.v) + padVisible(activeFile, innerWidth) + THEME.border(GLYPHS.v);
-  lines.push(activeLine);
+  lines.push(THEME.border(GLYPHS.v) + padVisible(activeFile, innerWidth) + THEME.border(GLYPHS.v));
 
-  // High-Resolution Unicode Progress Bar calculation
-  // Empty space ' ' instead of ░ for a clean, minimalist modern look
+  // 2. High-Resolution Unicode Progress Bar
   const barWidth = Math.max(10, innerWidth - 12);
   const exactProgress = (pct / 100) * barWidth;
   const fullBlocksCount = Math.floor(exactProgress);
@@ -61,7 +59,7 @@ export function renderProgressBar(state: TUIState, width: number): string[] {
   const pBarLine = ` [${barContent}] ` + chalk.bold.hex(pct >= 100 ? '#a6e3a1' : '#89b4fa')(pctStr);
   lines.push(THEME.border(GLYPHS.v) + padVisible(` ${pBarLine}`, innerWidth) + THEME.border(GLYPHS.v));
 
-  // Stats line (Size, Files, ETA)
+  // 3. Stats line (Size, Files, ETA)
   const leftStats = ` 📊 ${chalk.bold.hex('#cdd6f4')(sizeSummary)}  ${chalk.hex('#a6adc8')(fileSummary)}  ${chalk.hex('#6c7086')(checkSummary)}`;
   const rightStats = `${chalk.bold.hex('#f9e2af')(etaStr)} `;
   const statsPad = Math.max(1, innerWidth - visibleLength(leftStats) - visibleLength(rightStats));
@@ -74,5 +72,6 @@ export function renderProgressBar(state: TUIState, width: number): string[] {
       THEME.border(GLYPHS.v)
   );
 
+  // Exactly 3 lines
   return lines;
 }

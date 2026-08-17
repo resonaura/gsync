@@ -197,28 +197,27 @@ function renderHeader(state, config, width) {
   else if (state.status === "COMPLETED") statusBadge = THEME.badgeCompleted;
   else if (state.status === "ERROR") statusBadge = THEME.badgeError;
   const title = THEME.headerTitle(" \u26A1 GSYNC ") + chalk2.hex("#6c7086")("v1.0.0");
-  const modeBadge = config.mode === "daemon" ? chalk2.hex("#89dceb")("[SERVICE ATTACHED]") : chalk2.hex("#a6adc8")("[DIRECT SYNC]");
+  const modeBadge = config.mode === "daemon" ? chalk2.hex("#89dceb")("[DAEMON]") : chalk2.hex("#a6adc8")("[DIRECT]");
   const elapsedSecs = Math.floor((Date.now() - state.startTime) / 1e3) - state.totalPausedDuration;
   const timer = chalk2.hex("#a6adc8")(`\u23F1 ${formatDuration(Math.max(0, elapsedSecs))}`);
   const topHeaderTitle = `\u256D\u2500${title}\u2500${modeBadge}\u2500`;
   const topHeaderRight = `\u2500${timer}\u2500\u256E`;
   const topPad = Math.max(0, width - visibleLength(topHeaderTitle) - visibleLength(topHeaderRight));
   lines.push(THEME.border(topHeaderTitle + GLYPHS.h.repeat(topPad) + topHeaderRight));
-  const sourceDest = chalk2.hex("#cdd6f4")("\u{1F4C2} ") + chalk2.bold.hex("#f5c2e7")(truncateMiddle(config.source, 25)) + chalk2.hex("#6c7086")(" \u2794 ") + chalk2.bold.hex("#89b4fa")(truncateMiddle(config.remote, 25));
-  const speedText = state.metrics.speed && state.metrics.speed !== "0 B/s" ? chalk2.bold.hex("#a6e3a1")(` \u{1F680} ${state.metrics.speed}`) : "";
+  const sourceDest = chalk2.hex("#cdd6f4")("\u{1F4C2} ") + chalk2.bold.hex("#f5c2e7")(truncateMiddle(config.source, 24)) + chalk2.hex("#6c7086")(" \u2794 ") + chalk2.bold.hex("#89b4fa")(truncateMiddle(config.remote, 24));
+  const speedText = state.metrics.speed && state.metrics.speed !== "0 B/s" && state.metrics.speed !== "0B/s" ? chalk2.bold.hex("#a6e3a1")(` \u{1F680} ${state.metrics.speed}`) : "";
   const leftContent = ` ${sourceDest}`;
   const rightContent = `${speedText}  ${statusBadge} `;
   const centerPad = Math.max(1, innerWidth - visibleLength(leftContent) - visibleLength(rightContent));
   lines.push(
     THEME.border(GLYPHS.v) + leftContent + " ".repeat(centerPad) + rightContent + THEME.border(GLYPHS.v)
   );
-  lines.push(THEME.border(GLYPHS.tLeft + GLYPHS.h.repeat(innerWidth) + GLYPHS.tRight));
   return lines;
 }
 
 // src/tui/components/log-viewport.ts
 import chalk3 from "chalk";
-function renderLogViewport(state, width, height) {
+function renderLogViewport(state, width, effectiveRows) {
   const lines = [];
   const innerWidth = Math.max(10, width - 2);
   const totalLogs = state.logs.length;
@@ -231,22 +230,19 @@ function renderLogViewport(state, width, height) {
   const vpHeaderRight = `\u2500[ ${scrollInfo} ]\u2500\u2524`;
   const vpPad = Math.max(0, width - visibleLength(vpHeaderLeft) - visibleLength(vpHeaderRight));
   lines.push(THEME.border(vpHeaderLeft + GLYPHS.h.repeat(vpPad) + vpHeaderRight));
-  const effectiveHeight = Math.max(1, height - 2);
   let startIdx;
   if (state.autoScroll || state.scrollOffset === 0) {
-    startIdx = Math.max(0, totalLogs - effectiveHeight);
+    startIdx = Math.max(0, totalLogs - effectiveRows);
   } else {
     const endIdx = Math.max(0, totalLogs - state.scrollOffset);
-    startIdx = Math.max(0, endIdx - effectiveHeight);
+    startIdx = Math.max(0, endIdx - effectiveRows);
   }
-  const visibleLogs = state.logs.slice(startIdx, startIdx + effectiveHeight);
-  for (let i = 0; i < effectiveHeight; i++) {
+  const visibleLogs = state.logs.slice(startIdx, startIdx + effectiveRows);
+  for (let i = 0; i < effectiveRows; i++) {
     const log = visibleLogs[i];
-    let rowContent = "";
+    let rowContent = " ";
     if (log) {
       rowContent = formatLogRow(log, innerWidth);
-    } else {
-      rowContent = " ";
     }
     lines.push(THEME.border(GLYPHS.v) + padVisible(rowContent, innerWidth) + THEME.border(GLYPHS.v));
   }
@@ -283,12 +279,12 @@ function formatLogRow(log, maxWidth) {
   const prefix = ` ${time} ${badge} `;
   const prefixVisLen = visibleLength(prefix);
   const maxMsgLen = Math.max(5, maxWidth - prefixVisLen - 1);
-  const cleanMessage = stripInternalNoise(log.message);
+  const cleanMessage = cleanLogMessage(log.message);
   const truncatedMsg = truncateMiddle(cleanMessage, maxMsgLen);
   return `${prefix}${msgColor(truncatedMsg)}`;
 }
-function stripInternalNoise(str) {
-  return str.replace(/^<\d+>(INFO|NOTICE|DEBUG|WARN|ERROR)\s*:\s*/i, "").replace(/^\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}:\d{2}\s+(INFO|NOTICE|DEBUG|WARN|ERROR)\s*:\s*/i, "");
+function cleanLogMessage(str) {
+  return str.replace(/^\[\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM)?\]\s*/i, "").replace(/^\[(INFO|NOTICE|DEBUG|WARN|ERROR)\]\s*/i, "").replace(/^<\d+>(INFO|NOTICE|DEBUG|WARN|ERROR)\s*:\s*/i, "").replace(/^\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}:\d{2}\s+(INFO|NOTICE|DEBUG|WARN|ERROR)\s*:\s*/i, "").trim();
 }
 
 // src/tui/components/progress-bar.ts
@@ -306,8 +302,7 @@ function renderProgressBar(state, width) {
   const fileSummary = metrics.totalFiles > 0 ? `Files: ${metrics.filesTransferred}/${metrics.totalFiles}` : metrics.filesTransferred > 0 ? `Files: ${metrics.filesTransferred}` : "Files: ...";
   const checkSummary = metrics.totalChecks > 0 ? `Checks: ${metrics.checksDone}/${metrics.totalChecks}` : "";
   const activeFile = metrics.currentFile ? chalk4.hex("#cba6f7")(` \u{1F4C4} Active: ${truncateMiddle(metrics.currentFile, innerWidth - 12)}`) : chalk4.hex("#6c7086")(" \u{1F4A4} No active file transfers in flight");
-  const activeLine = THEME.border(GLYPHS.v) + padVisible(activeFile, innerWidth) + THEME.border(GLYPHS.v);
-  lines.push(activeLine);
+  lines.push(THEME.border(GLYPHS.v) + padVisible(activeFile, innerWidth) + THEME.border(GLYPHS.v));
   const barWidth = Math.max(10, innerWidth - 12);
   const exactProgress = pct / 100 * barWidth;
   const fullBlocksCount = Math.floor(exactProgress);
@@ -342,9 +337,9 @@ function renderKeybindingsBar(state, width) {
   const pauseLabel = state.status === "PAUSED" ? "Resume" : "Pause";
   const shortcuts = [
     { key: "Space/P", desc: pauseLabel },
-    { key: "\u2191/\u2193", desc: "Scroll" },
+    { key: "\u2191/\u2193/Wheel", desc: "Scroll" },
     { key: "F/S", desc: state.autoScroll ? "Lock Scroll" : "Autoscroll" },
-    { key: "C", desc: "Clear Logs" },
+    { key: "C", desc: "Clear" },
     { key: "H/?", desc: "Help" },
     { key: "Q/^C", desc: "Quit" }
   ];
@@ -410,7 +405,7 @@ function renderHelpModal(width, height) {
 var TUIRenderer = class {
   lastRenderOutput = "";
   render(state, config, width, height) {
-    if (width < 30 || height < 12) {
+    if (width < 30 || height < 10) {
       this.renderSmallScreenWarning(width, height);
       return;
     }
@@ -422,9 +417,9 @@ var TUIRenderer = class {
     const headerLines = renderHeader(state, config, width);
     const progressBarLines = renderProgressBar(state, width);
     const footerLines = renderKeybindingsBar(state, width);
-    const reservedHeight = headerLines.length + progressBarLines.length + footerLines.length;
-    const viewportHeight = Math.max(3, height - reservedHeight);
-    const logLines = renderLogViewport(state, width, viewportHeight);
+    const fixedRows = headerLines.length + 2 + progressBarLines.length + footerLines.length;
+    const effectiveLogRows = Math.max(1, height - fixedRows);
+    const logLines = renderLogViewport(state, width, effectiveLogRows);
     const fullScreenLines = [
       ...headerLines,
       ...logLines,
@@ -442,7 +437,7 @@ var TUIRenderer = class {
     }
   }
   renderSmallScreenWarning(width, height) {
-    const msg = `Terminal too small: ${width}x${height} (Min: 30x12)`;
+    const msg = `Terminal too small: ${width}x${height} (Min: 30x10)`;
     process.stdout.write(ESC.cursorHome + msg);
   }
 };
@@ -671,7 +666,6 @@ var SyncRunner = class extends EventEmitter {
       "--stats=1s",
       "--stats-one-line",
       "--log-level=INFO",
-      // Always exclude cinema to prevent massive unwanted media uploads
       "--exclude=cinema/**",
       "--exclude=cinema/",
       "--exclude=/cinema/**",
@@ -687,8 +681,8 @@ var SyncRunner = class extends EventEmitter {
         stdio: ["pipe", "pipe", "pipe"]
       });
       this.setStatus("RUNNING");
-      this.handleStream(this.childProcess.stdout, false);
-      this.handleStream(this.childProcess.stderr, true);
+      this.handleStream(this.childProcess.stdout);
+      this.handleStream(this.childProcess.stderr);
       this.childProcess.on("error", (err) => {
         this.setStatus("ERROR");
         this.addLog("ERROR", `Process error: ${err.message}`);
@@ -756,7 +750,7 @@ var SyncRunner = class extends EventEmitter {
     } catch {
     }
   }
-  handleStream(stream, isStderr) {
+  handleStream(stream) {
     if (!stream) return;
     let buffer = "";
     stream.on("data", (chunk) => {
@@ -770,18 +764,19 @@ var SyncRunner = class extends EventEmitter {
         if (isProgress && metrics) {
           this.emit("metrics", metrics);
         } else {
-          const level = this.detectLogLevel(trimmed, isStderr);
+          const level = this.detectLogLevel(trimmed);
           this.addLog(level, trimmed);
         }
       }
     });
   }
-  detectLogLevel(line, isStderr) {
+  detectLogLevel(line) {
     const upper = line.toUpperCase();
-    if (upper.includes("ERROR") || upper.includes("FAILED") || isStderr) return "ERROR";
-    if (upper.includes("WARN") || upper.includes("WAIT")) return "WARN";
+    if (upper.includes("ERROR") || upper.includes("FATAL") || upper.includes("FAILED")) return "ERROR";
+    if (upper.includes("WARN") || upper.includes("WAITING") || upper.includes("PAUSED")) return "WARN";
     if (upper.includes("DONE") || upper.includes("COMPLETED") || upper.includes("SUCCESS") || upper.includes("\u041F\u041E\u0413\u041D\u0410\u041B\u0418"))
       return "SUCCESS";
+    if (upper.includes("DEBUG")) return "DEBUG";
     return "INFO";
   }
   setStatus(status) {
@@ -810,7 +805,7 @@ var ServiceWatcher = class extends EventEmitter2 {
   logIdCounter = 0;
   serviceName;
   isPaused = false;
-  constructor(serviceName = "gdrive-sync.service") {
+  constructor(serviceName = "gsync.service") {
     super();
     this.serviceName = serviceName;
     this.parser = new ProgressParser();
@@ -922,8 +917,10 @@ var ServiceWatcher = class extends EventEmitter2 {
   }
   detectLogLevel(line) {
     const upper = line.toUpperCase();
-    if (upper.includes("ERROR") || upper.includes("FAILED")) return "ERROR";
-    if (upper.includes("WARN") || upper.includes("WAIT")) return "WARN";
+    if (upper.includes("INFO") || upper.includes("NOTICE") || upper.includes("BANDWIDTH LIMITER") || upper.includes("STARTING SYNC"))
+      return "INFO";
+    if (upper.includes("ERROR") || upper.includes("FATAL") || upper.includes("FAILED")) return "ERROR";
+    if (upper.includes("WARN") || upper.includes("PAUSED") || upper.includes("WAITING")) return "WARN";
     if (upper.includes("DONE") || upper.includes("COMPLETED") || upper.includes("SUCCESS") || upper.includes("\u041F\u041E\u0413\u041D\u0410\u041B\u0418"))
       return "SUCCESS";
     return "INFO";
