@@ -8,6 +8,11 @@
 
 High-performance interactive Terminal UI (TUI) for real-time Google Drive, rsync, and rclone file synchronization with POSIX pause/resume controls and nano-style keybindings.
 
+
+<p align="center">
+  <img src="media/gsync-tui.png" width="800" alt="GSync Terminal UI Cloud Synchronizer" />
+</p>
+
 ---
 
 ## ✨ Features
