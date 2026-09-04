@@ -5,6 +5,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg?logo=node.js&logoColor=white)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6.svg?logo=typescript&logoColor=white)](package.json)
 [![CLI](https://img.shields.io/badge/CLI-TUI-orange.svg)](bin/gsync.js)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/resonaura)
 
 High-performance interactive Terminal UI (TUI) for real-time Google Drive, rsync, and rclone file synchronization with POSIX pause/resume controls and nano-style keybindings.
 
