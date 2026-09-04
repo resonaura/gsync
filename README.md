@@ -1,7 +1,7 @@
 # ⚡ GSYNC
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](package.json)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](package.json)
+[![Version](https://img.shields.io/badge/Version-1.0.0-blue.svg)](package.json)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](package.json)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg?logo=node.js&logoColor=white)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6.svg?logo=typescript&logoColor=white)](package.json)
 [![CLI](https://img.shields.io/badge/CLI-TUI-orange.svg)](bin/gsync.js)
